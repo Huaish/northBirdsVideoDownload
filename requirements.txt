@@ -1,0 +1,6 @@
+beautifulsoup4==4.12.3
+pandas==1.5.1
+Requests==2.31.0
+selenium==4.17.2
+termcolor==2.4.0
+vimeo_downloader==0.4.1
