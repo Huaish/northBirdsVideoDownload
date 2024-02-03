@@ -13,8 +13,8 @@ from vimeo_downloader import Vimeo
 
 def login(driver, username, password):
     driver.get('https://northbirds.com/users/sign_in?from=iframe')  
-    driver.find_element(By.NAME, 'user[email]').send_keys('lulueven88@gmail.com')
-    driver.find_element(By.NAME, 'user[password]').send_keys('lulueven88')
+    driver.find_element(By.NAME, 'user[email]').send_keys(username)
+    driver.find_element(By.NAME, 'user[password]').send_keys(password)
     driver.find_element(By.NAME, 'commit').click()
 
 def convert_cookies_to_str(cookies):
@@ -32,7 +32,7 @@ def get_course_info(driver, save_folder='lesson', save_name='course_info.md'):
         title = lesson.find(class_='item-title').text.strip().replace(' ', '')
         time = lesson.find(class_='time').text.strip()
         url = lesson.find('a')['href']
-        info = pd.DataFrame({'Lesson': [lesson_no], 'Title': [f'[{title}]({title}.mp4)'], 'Time': [time], 'URL': [url]})
+        info = pd.DataFrame({'Lesson': [lesson_no], 'Title': [f'[{title}]({save_folder}/{title}.mp4)'], 'Time': [time], 'URL': [url]})
         course_info = pd.concat([course_info, info], ignore_index=True)
 
     if not os.path.exists(save_folder):
@@ -42,10 +42,10 @@ def get_course_info(driver, save_folder='lesson', save_name='course_info.md'):
         f.write(course_info.to_markdown(index=False))
     return course_info
 
-def download_video(vimeo_url, embedded_on, cookies, save_folder):
+def download_video(vimeo_url, embedded_on, cookies, save_folder, file_name=None):
     v = Vimeo(vimeo_url, embedded_on, cookies=cookies)
     stream = v.streams
-    stream[-1].download(save_folder)
+    stream[-1].download(save_folder, filename=file_name)
 
 def multi_dload(course_info, embedded_on, cookies, save_folder):
     print('Downloading {} videos...'.format(len(course_info)))
@@ -53,18 +53,19 @@ def multi_dload(course_info, embedded_on, cookies, save_folder):
     max_threads = threading.active_count() + 20
     threads = []
     for i in range(len(course_info)):
-        if not os.path.exists(chapter_title):
-            os.makedirs(chapter_title)
+        if not os.path.exists(save_folder):
+            os.makedirs(save_folder)
         
         # if video exists, skip
-        title = course_info['Title'][i].split('(')[1].split(')')[0]
-        if os.path.exists(chapter_title + '/' + title):
+        video_title = course_info['Title'][i].split('[')[1].split(']')[0]
+        video_path = course_info['Title'][i].split('(')[1].split(')')[0]
+        if os.path.exists(video_path):
             termcolor.cprint('Skipped ' + course_info['Title'][i], 'yellow')
             continue
         
         # else download video
         if threading.active_count() < max_threads:
-            t = threading.Thread(target=download_video, args=(course_info['URL'][i], embedded_on, cookies, save_folder))
+            t = threading.Thread(target=download_video, args=(course_info['URL'][i], embedded_on, cookies, save_folder, video_title))
             t.start()
             threads.append(t)
         else:
@@ -77,7 +78,7 @@ def multi_dload(course_info, embedded_on, cookies, save_folder):
     print('Finished downloading {} videos.'.format(len(course_info)))
     
 
-for course_no in range(1, 23):
+for course_no in range(1, 24):
 
     driver = webdriver.Chrome()
 
@@ -94,7 +95,7 @@ for course_no in range(1, 23):
     print(chapter_title)
 
     # get course info
-    course_info = get_course_info(driver, save_folder=chapter_title, save_name='README.md')
+    course_info = get_course_info(driver, save_folder= 'videos/' + chapter_title, save_name='README.md')
 
     # get cookies
     driver.find_element(By.ID, 'product-view').find_element(By.CLASS_NAME, 'item').find_element(By.TAG_NAME, 'a').click()
@@ -106,7 +107,8 @@ for course_no in range(1, 23):
 
 
     # download videos
-    multi_dload(course_info, url, cookie, chapter_title)
+    multi_dload(course_info, url, cookie, 'videos/' + chapter_title)
+    
     # print('Downloading {} videos...'.format(len(course_info)))
     # for i in range(len(course_info)):
     #     if not os.path.exists(chapter_title):
@@ -123,4 +125,3 @@ for course_no in range(1, 23):
     #     print('\n')
 
     # print('Finished downloading {} videos.'.format(len(course_info)))
-    break
